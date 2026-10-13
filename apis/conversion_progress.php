@@ -19,7 +19,7 @@ $targetSize = is_file($targetPath) ? (int) filesize($targetPath) : 0;
 
 $percent = 0;
 if ($sourceSize > 0 && $targetSize > 0) {
-    // estimativa: arquivo convertido H264 costuma ter ~60-80% do original
+    // estimativa: arquivo convertido H264 costuma ter ~60-80% do original, usando 70% como base
     $estimatedFinal = (int) ($sourceSize * 0.7);
     $percent = min(99, (int) round($targetSize / $estimatedFinal * 100));
 }
