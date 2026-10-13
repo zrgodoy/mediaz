@@ -1,0 +1,7 @@
+# Ignorar arquivos baixados e temporários
+downloads/*
+!downloads/.gitkeep
+
+# Logs e arquivos do sistema operacional
+.DS_Store
+Thumbs.db
