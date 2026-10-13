@@ -15,7 +15,7 @@ if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
     exit;
 }
 
-// Pasta de destino dos arquivos salvos
+// Pasta de destino dos arquivos salvos (subindo de apis/ para a raiz de mediaz)
 $downloadDir = __DIR__ . '/../downloads/';
 if (!file_exists($downloadDir)) {
     mkdir($downloadDir, 0755, true);
@@ -32,7 +32,6 @@ foreach (glob($downloadDir . '*') as $oldFile) {
 }
 
 // Configuração do comando yt-dlp
-// O yt-dlp detecta automaticamente se é YouTube, Instagram, Facebook, TikTok, etc.
 $outputTemplate = $downloadDir . '%(title)s.%(ext)s';
 
 if ($formatType === 'audio') {
@@ -42,23 +41,19 @@ if ($formatType === 'audio') {
         escapeshellarg($url)
     );
 } else {
-    // Força a mesclagem correta para MP4 compatível com web
-    $cmd = sprintf('yt-dlp -f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4] / bv*+ba/b" --merge-output-format mp4 -o %s %s 2>&1', 
+    // Força o download e a reencodagem para H.264 e AAC (100% compatível com o Premiere)
+    $cmd = sprintf('yt-dlp --recode-video mp4 --postprocessor-args "VideoConvertor:-c:v libx264 -c:a aac" -o %s %s 2>&1', 
         escapeshellarg($outputTemplate), 
         escapeshellarg($url)
     );
 }
-
 // Executa o comando no servidor
 exec($cmd, $output, $exitCode);
 
 if ($exitCode !== 0) {
-   // ALTERAÇÃO TEMPORÁRIA DE DIAGNÓSTICO:
-    // Em vez de uma mensagem genérica, vamos devolver o erro cru do yt-dlp para a tela
     echo json_encode([
         'success' => false, 
-        'error' => 'Debug yt-dlp: ' . implode(' | ', $output),
-        'exit_code' => $exitCode
+        'error' => 'Falha ao processar link. Verifique se a URL é pública e suportada.'
     ]);
     exit;
 }
@@ -76,7 +71,9 @@ usort($files, function($a, $b) {
 
 $latestFile = $files[0];
 $fileName = basename($latestFile);
-$fileUrl = '../downloads/' . $fileName; // Sobe um nível para o front-end encontrar o arquivo
+
+// URL pública relativa à raiz (mediaz/)
+$fileUrl = 'downloads/' . $fileName;
 
 echo json_encode([
     'success' => true,

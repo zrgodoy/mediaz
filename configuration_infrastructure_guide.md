@@ -1,154 +1,255 @@
-# 📚 ZRG Mediaz - Server Configuration & Documentation
+# 📚 ZRG Mediaz - Guia de Configuração e Infraestrutura
 
-Este documento detalha toda a infraestrutura, stack tecnológica, permissões de diretório e rotinas de segurança configuradas para o **ZRG Mediaz** em um ambiente Ubuntu 24.04 LTS.
-
----
-
-## 1. Stack Tecnológica e Requisitos de Sistema
-
-- **Sistema Operacional:** Ubuntu 24.04 LTS (Kernel 6.8+)
-- **Servidor Web:** Apache 2
-- **Linguagem Backend:** PHP 8.3+
-- **Core de Processamento:** 
-  - `yt-dlp` (Gerenciador de extração e downloads)
-  - `ffmpeg` / `ffprobe` (Processamento e mesclagem de áudio/vídeo)
-  - `Node.js` (Runtime JavaScript obrigatório para os extratores e desafios do YouTube)
-- **Frontend:** Tailwind CSS (via CDN) + FontAwesome 6.4
+Este documento registra a configuração atual do projeto **ZRG Mediaz**, com foco na infraestrutura mínima necessária para executar a aplicação em um ambiente Linux/Ubuntu e no comportamento real dos componentes presentes no repositório.
 
 ---
 
-## 2. Estrutura de Diretórios Escalável
+## 1. Visão Geral
 
-A organização do projeto isola a interface, os scripts de API e o armazenamento de mídia:
+O projeto é uma aplicação web simples em PHP para baixar ou converter mídias a partir de URLs públicas. A interface principal está em `index.php`, a API de processamento está em `apis/download.php` e a área administrativa para remover arquivos está em `admin/files.php`.
+
+A aplicação usa:
+
+- Apache 2 ou qualquer servidor web PHP compatível
+- PHP 8.x
+- `yt-dlp` para extração e processamento
+- `ffmpeg` para transcodificação e otimização de vídeo
+- Tailwind CSS via CDN para layout front-end
+- Font Awesome para ícones
+
+---
+
+## 2. Estrutura Atual do Projeto
 
 ```text
 mediaz/
-├── index.php             # Interface web principal (Tailwind CSS + AJAX)
-├── favicon.png           # Ícone do site
-├── downloads/            # Diretório de armazenamento temporário (Gerenciado por PHP/Cron)
-├── docs/
-│   └── server-configuration.md # Este documento de configuração
-└── apis/
-    └── download.php      # Script backend de execução e segurança
+├── index.php                 # Página principal do front-end
+├── index copy.php            # Cópia de backup local do arquivo inicial
+├── favicon.png              # Ícone do sistema
+├── admin/
+│   └── files.php            # Gerenciamento de arquivos em downloads/
+├── apis/
+│   ├── download copy.php     # Backup local do endpoint de download
+│   └── download.php         # Endpoint de processamento de mídia
+├── downloads/               # Diretório de saída dos arquivos gerados
+├── .gitignore               # Regras de git do projeto
+├── configuration_infrastructure_guide.md
+└── README.md (se existir no ambiente de deploy, opcional)
 ```
+
+> Observação: o projeto atual não possui uma pasta `docs/` nem um arquivo `docs/server-configuration.md` no repositório. Este guia funciona como a documentação de infraestrutura do projeto.
 
 ---
 
-## 3. Comandos de Instalação e Configuração no Ubuntu 24.04
+## 3. Requisitos de Sistema
 
-### 3.1. Atualização do Sistema e Dependências
-Execute os comandos abaixo para garantir que o Apache, PHP, FFmpeg e Node.js estejam instalados e atualizados:
+### 3.1. Dependências principais
 
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y apache2 php libapache2-mod-php nodejs ffmpeg python3-pip curl
+sudo apt install -y apache2 php libapache2-mod-php ffmpeg python3-pip curl
 ```
 
-### 3.2. Instalação e Atualização do `yt-dlp`
-Para manter o suporte a extrações recentes de plataformas de vídeo:
+### 3.2. Instalação do `yt-dlp`
 
 ```bash
 sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
 sudo chmod a+rx /usr/local/bin/yt-dlp
 ```
 
-### 3.3. Configuração de Permissões do Servidor Web (`www-data`)
-Para que o Apache consiga gravar e ler os arquivos baixados sem erros de permissão (`Permission denied`):
+### 3.3. Verificação rápida
 
 ```bash
-sudo mkdir -p /var/www/html/mediaz/downloads
-sudo chown -R www-data:www-data /var/www/html/mediaz/
-sudo chmod -R 775 /var/www/html/mediaz/downloads
+yt-dlp --version
+ffmpeg -version | head
+php -v
 ```
 
 ---
 
-## 4. Configuração do Backend (`apis/download.php`)
+## 4. Permissões e Estrutura de Arquivos
 
-O script realiza validação estrita de URLs, executa o comando `yt-dlp` tratando fluxos de vídeo (`mp4`) e áudio (`mp3`), e aplica a limpeza automática de arquivos legados.
+A pasta `downloads/` é o ponto de saída para os arquivos gerados pelo sistema. Por padrão, ela deve ser criada no diretório raiz do projeto e acessível pelo usuário do servidor web.
+
+```bash
+sudo mkdir -p /var/www/html/mediaz/downloads
+sudo chown -R www-data:www-data /var/www/html/mediaz
+sudo chmod -R 755 /var/www/html/mediaz
+sudo chmod -R 775 /var/www/html/mediaz/downloads
+```
+
+### Importante
+
+- `www-data` precisa ler e gravar em `downloads/`
+- arquivos antigos são limpos em execução no backend
+- a pasta deve ser persistente e não exposta como área de armazenamento insegura fora do contexto da aplicação
+
+---
+
+## 5. Fluxo de Uso da Aplicação
+
+### 5.1. Front-end
+
+A página principal `index.php` monta o formulário e realiza uma requisição AJAX para:
+
+```text
+/apis/download.php
+```
+
+Os campos enviados no formulário incluem:
+
+- `url` — URL da mídia
+- `codec_preset` — tipo de processamento
+
+### 5.2. Presets suportados
+
+O backend aceita os seguintes valores em `codec_preset`:
+
+- `h264` — converte para H.264 em MP4 com `ffmpeg` e otimização para edição/Prerender
+- `best` — tenta usar a melhor qualidade original em MP4
+- `audio_mp3` — extrai apenas o áudio em MP3
+
+### 5.3. Validação do backend
+
+No arquivo `apis/download.php`, a API:
+
+1. exige método `POST`
+2. valida que a URL foi enviada e é uma URL válida
+3. cria a pasta `downloads/` quando necessário
+4. limpa arquivos antigos com mais de 30 minutos
+5. executa `yt-dlp` com o comando correto conforme o preset
+6. verifica o retorno do processo
+7. retorna JSON com `success` e `file_url` no caso de êxito
+
+---
+
+## 6. Comportamento Real do Endpoint
+
+O endpoint atual usa comandos como:
+
+```bash
+yt-dlp -x --audio-format mp3 -o '%(title)s.%(ext)s' <url>
+```
+
+ou
+
+```bash
+yt-dlp -f "bv*+ba/b" --merge-output-format mp4 --postprocessor-args "ffmpeg:-c:v libx264 -preset fast -crf 22 -c:a aac -b:a 192k -movflags +faststart" -o '%(title)s.%(ext)s' <url>
+```
+
+O retorno da API segue este formato:
+
+```json
+{
+  "success": true,
+  "file_url": "downloads/arquivo.mp4"
+}
+```
+
+Ou, em caso de falha:
+
+```json
+{
+  "success": false,
+  "error": "Erro no servidor: ..."
+}
+```
+
+---
+
+## 7. Administração dos Arquivos
+
+O painel em `admin/files.php` permite:
+
+- listar os arquivos disponíveis em `downloads/`
+- baixar um arquivo diretamente
+- excluir um item individual
+- limpar toda a pasta com um único clique
+
+Ele usa `glob()` para listar os arquivos e ordena pela data mais recente.
+
+---
+
+## 8. Segurança e Boas Práticas
+
+### Recomendado
+
+- manter a aplicação em um ambiente acessível apenas para uso autorizado
+- limitar o uso a URLs públicas e confiáveis
+- não expor a pasta `downloads/` como armazenamento geral sem controle
+- manter `yt-dlp` atualizado
+- verificar `ffmpeg` e `php` após mudanças de sistema
+
+### Observações importantes
+
+- a API executa comandos de shell via `exec()`; isso exige cuidado com entrada externa
+- a validação atual é limitada a `FILTER_VALIDATE_URL` e não implementa whitelist de domínios
+- a aplicação é funcional para uso interno/local, mas não deve ser tratada como um serviço público sem reforço de segurança
+
+---
+
+## 9. Limpeza Automática
+
+A aplicação já implementa limpeza de arquivos antigos no próprio PHP:
 
 ```php
-<?php
-// apis/download.php
-header('Content-Type: application/json');
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['success' => false, 'error' => 'Método inválido.']);
-    exit;
-}
-
-$url = trim($_POST['url'] ?? '');
-$formatType = $_POST['format'] ?? 'video';
-
-if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
-    echo json_encode(['success' => false, 'error' => 'URL inválida ou vazia.']);
-    exit;
-}
-
-// Pasta de destino na raiz do projeto
-$downloadDir = __DIR__ . '/../downloads/';
-if (!file_exists($downloadDir)) {
-    mkdir($downloadDir, 0755, true);
-}
-
-// Limpeza automática de arquivos com mais de 30 minutos (1800 segundos)
 foreach (glob($downloadDir . '*') as $oldFile) {
     if (is_file($oldFile) && (time() - filemtime($oldFile) > 1800)) {
         @unlink($oldFile);
     }
 }
+```
 
-$outputTemplate = $downloadDir . '%(title)s.%(ext)s';
+Isso remove arquivos mais antigos que 30 minutos automaticamente ao processar uma nova requisição.
 
-if ($formatType === 'audio') {
-    $cmd = sprintf('yt-dlp -x --audio-format mp3 -o %s %s 2>&1', 
-        escapeshellarg($outputTemplate), 
-        escapeshellarg($url)
-    );
-} else {
-    $cmd = sprintf('yt-dlp -f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4] / bv*+ba/b" --merge-output-format mp4 -o %s %s 2>&1', 
-        escapeshellarg($outputTemplate), 
-        escapeshellarg($url)
-    );
-}
+Também é possível configurar um cron do sistema para manutenção periódica:
 
-exec($cmd, $output, $exitCode);
-
-if ($exitCode !== 0) {
-    echo json_encode([
-        'success' => false, 
-        'error' => 'Falha ao processar link. Verifique se a URL é pública e suportada.'
-    ]);
-    exit;
-}
-
-$files = glob($downloadDir . '*');
-if (empty($files)) {
-    echo json_encode(['success' => false, 'error' => 'O arquivo não foi gerado corretamente.']);
-    exit;
-}
-
-usort($files, function($a, $b) {
-    return filemtime($b) - filemtime($a);
-});
-
-$latestFile = $files[0];
-$fileName = basename($latestFile);
-$fileUrl = 'downloads/' . $fileName;
-
-echo json_encode([
-    'success' => true,
-    'file_url' => $fileUrl
-]);
+```cron
+0 */2 * * * find /var/www/html/mediaz/downloads/ -type f -mmin +120 -delete
 ```
 
 ---
 
-## 5. Rotina de Segurança e Limpeza Automática
+## 10. Troubleshooting
 
-1. **Embutida no PHP:** Toda requisição executada varre o diretório de downloads e remove arquivos com mais de 30 minutos de vida.
-2. **Cron Job do Sistema (Opcional):** Para garantir a limpeza periódica independente de acessos web, configure a seguinte tarefa no crontab (`sudo crontab -e`):
-   ```cron
-   0 */2 * * * find /var/www/html/mediaz/downloads/ -type f -mmin +120 -delete
-   ```
-   *(Remove arquivos modificados há mais de 120 minutos a cada 2 horas).*
+### Problema: `Permission denied`
+
+```bash
+sudo chown -R www-data:www-data /var/www/html/mediaz
+sudo chmod -R 775 /var/www/html/mediaz/downloads
+```
+
+### Problema: `yt-dlp` não encontrado
+
+```bash
+which yt-dlp
+yt-dlp --version
+sudo chmod a+rx /usr/local/bin/yt-dlp
+```
+
+### Problema: vídeo não baixa ou falha no processamento
+
+- verificar se a URL é pública
+- confirmar que o serviço tem acesso ao internet
+- confirmar que `ffmpeg` está instalado
+- verificar o conteúdo do retorno JSON da API em rede/devtools
+
+### Problema: arquivo gerado não aparece
+
+- verificar se `downloads/` existe
+- confirmar permissões do diretório
+- confirmar se `yt-dlp` gerou o arquivo com nome diferente por causa do título da mídia
+
+---
+
+## 11. Resumo da Infraestrutura Atual
+
+A instalação atual do MediaZ funciona com uma estrutura simples e direta:
+
+- site web em PHP
+- API de processamento em `apis/download.php`
+- armazenamento em `downloads/`
+- limpezas automáticas e painel de gerenciamento
+- uso de ferramentas externas (`yt-dlp` e `ffmpeg`) para geração de conteúdo final
+
+Essa é a infraestrutura mínima necessária para manter a aplicação operacional em um ambiente Ubuntu com Apache e PHP.

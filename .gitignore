@@ -2,6 +2,16 @@
 downloads/*
 !downloads/.gitkeep
 
-# Logs e arquivos do sistema operacional
+# Cookies de autenticação (dados sensíveis)
+config/youtube_cookies.txt
+config/*.txt
+
+# Logs
+logs/
+
+# Locks temporários
+tmp/
+
+# Arquivos do sistema operacional
 .DS_Store
 Thumbs.db

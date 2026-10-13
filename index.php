@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ZRG Media Downloader</title>
     <link rel="icon" type="image/png" href="favicon.png">
-    <!-- Tailwind CSS via CDN para um design rápido e limpo -->
+    <!-- Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -20,7 +20,13 @@
                 </div>
                 <span class="font-bold text-lg tracking-wide">ZRG <span class="text-indigo-400">Mediaz</span></span>
             </div>
-            <span class="text-xs px-3 py-1 bg-indigo-950 text-indigo-300 border border-indigo-800/50 rounded-full">v1.0 Scalable</span>
+            <div class="flex items-center space-x-3">
+                <a href="admin/files.php" class="inline-flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700 transition">
+                    <i class="fa-solid fa-folder-open text-indigo-400"></i>
+                    <span>Gerenciar Arquivos</span>
+                </a>
+                <span class="text-xs px-3 py-1 bg-indigo-950 text-indigo-300 border border-indigo-800/50 rounded-full">v1.0 Scalable</span>
+            </div>
         </div>
     </header>
 
@@ -32,7 +38,7 @@
             <p class="text-slate-400 text-sm">Cole o link da sua plataforma favorita abaixo. O sistema detecta e processa automaticamente.</p>
         </div>
 
-        <!-- Plataformas Suportadas (Escalonável / Visual) -->
+        <!-- Plataformas Suportadas (Visual Original) -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
             <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl flex items-center space-x-3 opacity-90 hover:border-indigo-500/50 transition">
                 <i class="fa-brands fa-youtube text-red-500 text-xl"></i>
@@ -61,7 +67,7 @@
                         <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-500">
                             <i class="fa-solid fa-link"></i>
                         </span>
-                        <input type="url" id="urlInput" required placeholder="https://www.instagram.com/p/... ou youtube.com/watch?v=..." 
+                        <input type="url" id="urlInput" name="url" required placeholder="https://www.instagram.com/p/... ou youtube.com/watch?v=..." 
                             class="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-11 pr-4 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition">
                     </div>
                 </div>
@@ -70,7 +76,8 @@
                     <div>
                         <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Formato</label>
                         <select id="formatSelect" class="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition">
-                            <option value="video">Vídeo (MP4)</option>
+                            <option value="video_original">Vídeo Original (MP4, sem conversão)</option>
+                            <option value="video_premiere">Vídeo Compatível Premiere (H.264)</option>
                             <option value="audio">Áudio Apenas (MP3)</option>
                         </select>
                     </div>
@@ -127,7 +134,6 @@
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: `url=${encodeURIComponent(url)}&format=${format}`
                 });
-
                 const data = await response.json();
 
                 if (data.success) {
